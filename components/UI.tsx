@@ -34,25 +34,45 @@ export const LoadingIndicator: React.FC<{ message: string | null }> = ({ message
   </div>
 );
 
-export const ResultsTable: React.FC<{ data: any[] }> = ({ data }) => (
-  <table>
-    <thead>
-      <tr>
-        <th>商品名</th>
-        <th>単品JAN</th>
-        <th>kintone</th>
-        <th>情報</th>
-      </tr>
-    </thead>
-    <tbody>
-      {data.map((item, index) => (
-        <tr key={index}>
-          <td>{item.productName}</td>
-          <td>{item.janCode}</td>
-          <td>{item.kintoneStatus}</td>
-          <td>{item.infoStatus}</td>
+export const ResultsTable: React.FC<{ data: any }> = ({ data }) => {
+  if (!data) {
+    return <div>データがありません。</div>;
+  }
+
+  if (!Array.isArray(data)) {
+    return (
+      <div>
+        <h3>データが配列形式ではありません</h3>
+        <p>データの型: {typeof data}</p>
+        <pre>{JSON.stringify(data, null, 2)}</pre>
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return <div>データが空です。</div>;
+  }
+
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>商品名</th>
+          <th>単品JAN</th>
+          <th>kintone</th>
+          <th>情報</th>
         </tr>
-      ))}
-    </tbody>
-  </table>
-);
+      </thead>
+      <tbody>
+        {data.map((item, index) => (
+          <tr key={index}>
+            <td>{item.productName}</td>
+            <td>{item.janCode}</td>
+            <td>{item.kintoneStatus}</td>
+            <td>{item.infoStatus}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};

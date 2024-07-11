@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import axios from 'axios';
-import cheerio from 'cheerio';
+import puppeteer, { Browser } from 'puppeteer';
 import { AppError, handleApiError } from '../../lib/errorHandling';
 import { scrapingRules } from '../../config/scrapingRules';
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default async function handler(
   req: NextApiRequest,
@@ -14,53 +15,107 @@ export default async function handler(
 
   const spreadsheetData = req.body;
 
+  let browser: Browser;
   try {
-    const scrapedData = await Promise.all(
-      spreadsheetData.map(async (item: any) => {
-        const tsuruData = await scrapeWebsite(item.janCode, scrapingRules.tsuruHobby);
-        
-        if (tsuruData) return { ...item, ...tsuruData };
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
 
-        const amiamiData = await scrapeWebsite(item.janCode, scrapingRules.amiami);
-        return { ...item, ...amiamiData };
+    const scrapedData = await Promise.all(
+      spreadsheetData.map(async (item: any, index: number) => {
+        try {
+          await delay(index * 1000); // 1秒ごとに遅延
+
+          const tsuruData = await scrapeWebsite(browser, item.singleProductJan, scrapingRules.tsuruHobby);
+          if (Object.keys(tsuruData).length > 0) return { ...item, ...tsuruData };
+
+          const amiamiData = await scrapeWebsite(browser, item.singleProductJan, scrapingRules.amiami);
+          return { ...item, ...amiamiData };
+        } catch (error) {
+          console.error(`Error scraping data for JAN ${item.singleProductJan}:`, error);
+          return { ...item, error: String(error) };
+        }
       })
     );
 
     res.status(200).json(scrapedData);
   } catch (error) {
+    console.error('Error in scrapeData handler:', error);
     const { statusCode, message } = handleApiError(error);
-    res.status(statusCode).json({ message });
+    res.status(statusCode).json({ message, error: error instanceof Error ? error.stack : String(error) });
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 
-async function scrapeWebsite(janCode: string, rule: any) {
+async function scrapeWebsite(browser: Browser, singleProductJan: string, rule: any) {
+  const page = await browser.newPage();
   try {
-    const url = rule.url.replace('{janCode}', janCode);
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
+    const url = rule.url.replace('{janCode}', singleProductJan);
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
 
-    const result: { [key: string]: string } = {};
+    await page.setViewport({width: 1280, height: 800});
 
-    for (const [key, selector] of Object.entries(rule.selectors)) {
-      result[key] = $(selector as string).text().trim();
-    }
+    const result = await page.evaluate((selectors) => {
+      const data: { [key: string]: string } = {};
+
+      for (const [key, searchText] of Object.entries(selectors)) {
+        if (key === 'description') {
+          const element = document.querySelector('p[itemprop="description"]');
+          if (element) {
+            data[key] = element.textContent?.trim() || '';
+          }
+        } else {
+          const dt = Array.from(document.querySelectorAll('dt')).find(el => el.textContent?.includes(searchText as string));
+          if (dt) {
+            const dd = dt.nextElementSibling;
+            if (dd && dd.tagName === 'DD') {
+              data[key] = dd.textContent?.trim() || '';
+            }
+          }
+        }
+      }
+
+      return data;
+    }, rule.selectors);
 
     if (rule.productLinkSelector) {
-      const productUrl = $(rule.productLinkSelector).attr('href');
+      const productUrl = await page.evaluate((selector) => {
+        const link = document.querySelector(selector);
+        return link ? (link as HTMLAnchorElement).href : null;
+      }, rule.productLinkSelector);
+
       if (productUrl) {
-        const { data: productData } = await axios.get(productUrl);
-        const $product = cheerio.load(productData);
-        for (const [key, selector] of Object.entries(rule.selectors)) {
-          result[key] = $product(selector as string).text().trim();
-        }
+        await page.goto(productUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        const productData = await page.evaluate((selectors) => {
+          const data: { [key: string]: string } = {};
+          for (const [key, searchText] of Object.entries(selectors)) {
+            const heading = Array.from(document.querySelectorAll('p.heading_07')).find(el => el.textContent?.includes(searchText as string));
+            if (heading) {
+              const content = heading.nextElementSibling;
+              if (content && content.classList.contains('box_01')) {
+                data[key] = content.textContent?.trim() || '';
+              }
+            }
+          }
+          return data;
+        }, rule.selectors);
+
+        Object.assign(result, productData);
       }
     }
 
     return result;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
-      return null;
+    console.error('Error in scrapeWebsite:', error);
+    if (error instanceof Error) {
+      throw new AppError(`Error scraping website: ${error.message}`, 500, { singleProductJan, rule });
     }
-    throw new AppError('Error scraping website', 500, { janCode, rule });
+    throw new AppError('Unknown error scraping website', 500, { singleProductJan, rule });
+  } finally {
+    await page.close();
   }
 }

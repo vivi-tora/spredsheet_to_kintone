@@ -21,13 +21,13 @@ export default function MainApp() {
       // Scrape data
       setCurrentPhase('JANコードをもとに情報を取得中です...');
       const scrapedData = await scrapeData(spreadsheetData);
-      // console.log('スクレイピングデータ');
-      // console.log(JSON.stringify(scrapedData, null, 2));
+      console.log('スクレイピングデータ');
+      console.log(JSON.stringify(scrapedData, null, 2));
 
       // Add to Kintone
       setCurrentPhase('kintoneに情報を追加中です...');
-      const kintoneResults = await addToKintone(scrapedData);
-      setResults(kintoneResults);
+      // const kintoneResults = await addToKintone(scrapedData);
+      // setResults(kintoneResults);
     } catch (error) {
       console.error('Error during execution:', error);
       alert('エラーが発生しました。詳細はコンソールを確認してください。');

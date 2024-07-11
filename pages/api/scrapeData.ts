@@ -1,9 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import puppeteer, { Browser } from 'puppeteer';
+import puppeteer, { Browser } from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { AppError, handleApiError } from '../../lib/errorHandling';
 import { scrapingRules } from '../../config/scrapingRules';
+import { scrapeTsurumai } from './scrapeTsurumai';
+import { scrapeAmiami } from './scrapeAmiami';
+
+puppeteer.use(StealthPlugin());
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const hasNonEmptyValues = (obj: Record<string, any>): boolean => {
+  return Object.values(obj).some(value => {
+    if (typeof value === 'string') {
+      return value.trim() !== '';
+    }
+    return value !== null && value !== undefined;
+  });
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -14,24 +28,37 @@ export default async function handler(
   }
 
   const spreadsheetData = req.body;
+  console.log(`Received ${spreadsheetData.length} items to scrape`);
 
   let browser: Browser;
   try {
     browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ],
     });
+    console.log('Browser launched successfully');
 
     const scrapedData = await Promise.all(
       spreadsheetData.map(async (item: any, index: number) => {
         try {
-          await delay(index * 1000); // 1秒ごとに遅延
+          await delay(index * 2000); // 2秒ごとに遅延
+          console.log(`Processing item ${index + 1}/${spreadsheetData.length}, JAN: ${item.singleProductJan}`);
 
-          const tsuruData = await scrapeWebsite(browser, item.singleProductJan, scrapingRules.tsuruHobby);
-          if (Object.keys(tsuruData).length > 0) return { ...item, ...tsuruData };
+          const tsuruData = await scrapeTsurumai(browser, item.singleProductJan, scrapingRules.tsuruHobby);
+          console.log(`Tsurumai data for JAN ${item.singleProductJan}:`, tsuruData);
+          if (hasNonEmptyValues(tsuruData)) return { ...item, ...tsuruData };
 
-          const amiamiData = await scrapeWebsite(browser, item.singleProductJan, scrapingRules.amiami);
-          return { ...item, ...amiamiData };
+          const amiamiData = await scrapeAmiami(browser, item.singleProductJan, scrapingRules.amiami);
+          console.log(`Amiami data for JAN ${item.singleProductJan}:`, amiamiData);
+          if (hasNonEmptyValues(amiamiData)) return { ...item, ...amiamiData };
+
+          console.log(`No valid data found for JAN ${item.singleProductJan}`);
+          return item;
         } catch (error) {
           console.error(`Error scraping data for JAN ${item.singleProductJan}:`, error);
           return { ...item, error: String(error) };
@@ -39,6 +66,7 @@ export default async function handler(
       })
     );
 
+    console.log('All items processed');
     res.status(200).json(scrapedData);
   } catch (error) {
     console.error('Error in scrapeData handler:', error);
@@ -47,75 +75,7 @@ export default async function handler(
   } finally {
     if (browser) {
       await browser.close();
+      console.log('Browser closed');
     }
-  }
-}
-
-async function scrapeWebsite(browser: Browser, singleProductJan: string, rule: any) {
-  const page = await browser.newPage();
-  try {
-    const url = rule.url.replace('{janCode}', singleProductJan);
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-
-    await page.setViewport({width: 1280, height: 800});
-
-    const result = await page.evaluate((selectors) => {
-      const data: { [key: string]: string } = {};
-
-      for (const [key, searchText] of Object.entries(selectors)) {
-        if (key === 'description') {
-          const element = document.querySelector('p[itemprop="description"]');
-          if (element) {
-            data[key] = element.textContent?.trim() || '';
-          }
-        } else {
-          const dt = Array.from(document.querySelectorAll('dt')).find(el => el.textContent?.includes(searchText as string));
-          if (dt) {
-            const dd = dt.nextElementSibling;
-            if (dd && dd.tagName === 'DD') {
-              data[key] = dd.textContent?.trim() || '';
-            }
-          }
-        }
-      }
-
-      return data;
-    }, rule.selectors);
-
-    if (rule.productLinkSelector) {
-      const productUrl = await page.evaluate((selector) => {
-        const link = document.querySelector(selector);
-        return link ? (link as HTMLAnchorElement).href : null;
-      }, rule.productLinkSelector);
-
-      if (productUrl) {
-        await page.goto(productUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-        const productData = await page.evaluate((selectors) => {
-          const data: { [key: string]: string } = {};
-          for (const [key, searchText] of Object.entries(selectors)) {
-            const heading = Array.from(document.querySelectorAll('p.heading_07')).find(el => el.textContent?.includes(searchText as string));
-            if (heading) {
-              const content = heading.nextElementSibling;
-              if (content && content.classList.contains('box_01')) {
-                data[key] = content.textContent?.trim() || '';
-              }
-            }
-          }
-          return data;
-        }, rule.selectors);
-
-        Object.assign(result, productData);
-      }
-    }
-
-    return result;
-  } catch (error) {
-    console.error('Error in scrapeWebsite:', error);
-    if (error instanceof Error) {
-      throw new AppError(`Error scraping website: ${error.message}`, 500, { singleProductJan, rule });
-    }
-    throw new AppError('Unknown error scraping website', 500, { singleProductJan, rule });
-  } finally {
-    await page.close();
   }
 }

@@ -3,7 +3,7 @@ import { AppError } from '../../lib/errorHandling';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function scrapeAmiami(browser: Browser, singleProductJan: string, rule: any) {
+export async function scrapeAmiami(browser: Browser, singleProductJan: string, rule: any, existingData: { description: string; specifications: string }) {
   const page = await browser.newPage();
   try {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
@@ -21,12 +21,9 @@ export async function scrapeAmiami(browser: Browser, singleProductJan: string, r
 
     if (isChallengePresent) {
       console.log('Cloudflare challenge detected. Waiting for 30 seconds...');
-      await page.evaluate(wait, 10000);
+      await page.evaluate(wait, 30000);
       await page.reload({ waitUntil: 'networkidle0' });
     }
-
-    // const pageContent = await page.content();
-    // console.log('Page HTML:', pageContent);
 
     const productBoxExists = await page.evaluate(() => {
       return !!document.querySelector('.product_table_list .product_box') ||
@@ -56,8 +53,11 @@ export async function scrapeAmiami(browser: Browser, singleProductJan: string, r
 
         await page.waitForSelector('#explain.explain', { timeout: 30000 });
 
-        const result = await page.evaluate(() => {
-          const data: { [key: string]: string } = {};
+        const newData = await page.evaluate(() => {
+          const data: { description: string; specifications: string } = {
+            description: '',
+            specifications: '',
+          };
           const explainDiv = document.querySelector('#explain.explain');
           if (explainDiv) {
             const specHeading = Array.from(explainDiv.querySelectorAll('p.heading_07')).find(el => el.textContent?.includes('製品仕様'));
@@ -79,6 +79,11 @@ export async function scrapeAmiami(browser: Browser, singleProductJan: string, r
           return data;
         });
 
+        const result = {
+          description: existingData.description + (existingData.description && newData.description ? '\n' : '') + newData.description,
+          specifications: existingData.specifications + (existingData.specifications && newData.specifications ? '\n' : '') + newData.specifications
+        };
+
         console.log('Scraping result:', result);
         return result;
       } else {
@@ -88,7 +93,7 @@ export async function scrapeAmiami(browser: Browser, singleProductJan: string, r
       console.log('No product boxes found with any selector');
     }
 
-    return {};
+    return existingData;
   } catch (error) {
     console.error('Error in scrapeAmiami:', error);
     if (error instanceof Error) {

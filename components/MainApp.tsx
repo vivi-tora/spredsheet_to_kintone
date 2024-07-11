@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ExecuteButton, LoadingIndicator, ResultsTable } from './UI';
+import { processScrapedData } from '@/utils/processScrapedData';
 
 export default function MainApp() {
   const [isLoading, setIsLoading] = useState(false);
@@ -14,8 +15,8 @@ export default function MainApp() {
       // Fetch data from spreadsheet
       setCurrentPhase('スプレッドシートから情報を取得中です...');
       const spreadsheetData = await fetchSpreadsheetData();
-      // console.log('スプシデータ');
-      // console.log(JSON.stringify(spreadsheetData, null, 2));
+      console.log('スプシデータ');
+      console.log(JSON.stringify(spreadsheetData, null, 2));
 
 
       // Scrape data
@@ -24,10 +25,16 @@ export default function MainApp() {
       console.log('スクレイピングデータ');
       console.log(JSON.stringify(scrapedData, null, 2));
 
+      // Process scraped data
+      console.log('kintoneに追加するためにデータを整形中です...');
+      const processedData = processScrapedData(scrapedData);
+      console.log('処理データ');
+      console.log(JSON.stringify(processedData, null, 2));
+
       // Add to Kintone
       setCurrentPhase('kintoneに情報を追加中です...');
-      // const kintoneResults = await addToKintone(scrapedData);
-      // setResults(kintoneResults);
+      const kintoneResults = await addToKintone(processedData);
+      setResults(kintoneResults);
     } catch (error) {
       console.error('Error during execution:', error);
       alert('エラーが発生しました。詳細はコンソールを確認してください。');

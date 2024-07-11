@@ -3,7 +3,7 @@ import { AppError } from '../../lib/errorHandling';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function scrapeTsurumai(browser: Browser, singleProductJan: string, rule: any) {
+export async function scrapeTsurumai(browser: Browser, singleProductJan: string, rule: any, existingData: { description: string; specifications: string }) {
   const page = await browser.newPage();
   try {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
@@ -15,9 +15,6 @@ export async function scrapeTsurumai(browser: Browser, singleProductJan: string,
 
     console.log('Page loaded, waiting for content');
 
-    // const pageContent = await page.content();
-    // console.log('Page HTML:', pageContent);
-
     const productExists = await page.evaluate(() => {
       return !!document.querySelector('p[itemprop="description"]') ||
              !!document.querySelector('dt');
@@ -26,12 +23,12 @@ export async function scrapeTsurumai(browser: Browser, singleProductJan: string,
     console.log('Product information exists:', productExists);
 
     if (!productExists) {
-      console.log('Product information not found, waiting for 10 seconds');
-      await page.evaluate(wait, 10000);
+      // console.log('Product information not found, waiting for 10 seconds');
+      // await page.evaluate(wait, 10000);
     }
 
-    const result = await page.evaluate((selectors) => {
-      const data: { [key: string]: string } = {
+    const newData = await page.evaluate((selectors) => {
+      const data: { description: string; specifications: string } = {
         description: '',
         specifications: '',
       };
@@ -66,6 +63,11 @@ export async function scrapeTsurumai(browser: Browser, singleProductJan: string,
 
       return data;
     }, rule.selectors);
+
+    const result = {
+      description: existingData.description + (existingData.description && newData.description ? '\n' : '') + newData.description,
+      specifications: existingData.specifications + (existingData.specifications && newData.specifications ? '\n' : '') + newData.specifications
+    };
 
     console.log('Final scraping result:', result);
     return result;

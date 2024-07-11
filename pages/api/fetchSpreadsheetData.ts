@@ -71,6 +71,10 @@ export default async function handler(
         purchasingCostIncTax: row['仕入\n費用（税込）'],
         miyashitaAmountConfirmation: row['宮下\n金額確認用'],
         remarks: row['備考'],
+
+        // スプシにはないけど、スクレイピングで取得するもの達。各商品名に紐づけておきたいので商品名をあらかじめ書いておく
+        specifications: '\n\n' + '--- ' +row['バリエーション名称'] + ' ---',
+        description: '\n\n' + '--- ' + row['バリエーション名称'] + ' ---'
     }));
 
 

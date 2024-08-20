@@ -1,7 +1,21 @@
-import React from 'react';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
-export const PasswordForm: React.FC<{ onSubmit: (password: string) => void }> = ({ onSubmit }) => {
-  const [password, setPassword] = React.useState('');
+export const PasswordForm: React.FC<{
+  onSubmit: (password: string) => void;
+}> = ({ onSubmit }) => {
+  const [password, setPassword] = React.useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -9,70 +23,126 @@ export const PasswordForm: React.FC<{ onSubmit: (password: string) => void }> = 
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        placeholder="パスワードを入力"
-      />
-      <button type="submit">ログイン</button>
-    </form>
+    <div className="flex justify-center items-center min-h-screen">
+      <Card className="w-[350px]">
+        <CardHeader>
+          <CardTitle>ログイン</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="パスワードを入力"
+            />
+            <Button type="submit" className="w-full">
+              ログイン
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
-export const ExecuteButton: React.FC<{ onClick: () => void; disabled: boolean }> = ({ onClick, disabled }) => (
-  <button onClick={onClick} disabled={disabled}>
-    実行
-  </button>
+export const ExecuteButton: React.FC<{
+  onClick: () => void;
+  disabled: boolean;
+}> = ({ onClick, disabled }) => (
+  <div className="flex justify-center mt-4">
+    <Button onClick={onClick} disabled={disabled}>
+      実行
+    </Button>
+  </div>
 );
 
-export const LoadingIndicator: React.FC<{ message: string | null }> = ({ message }) => (
-  <div>
-    <div>Loading...</div>
-    {message && <div>{message}</div>}
+export const LoadingIndicator: React.FC<{ message: string | null }> = ({
+  message,
+}) => (
+  <div className="flex justify-center items-center min-h-screen">
+    <Card className="w-[350px]">
+      <CardContent className="pt-6">
+        <div className="flex flex-col items-center space-y-2">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p>Loading...</p>
+          {message && (
+            <p className="text-sm text-muted-foreground">{message}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   </div>
 );
 
 export const ResultsTable: React.FC<{ data: any }> = ({ data }) => {
   if (!data) {
-    return <div>データがありません。</div>;
+    return (
+      <div className="flex justify-center mt-4">
+        <Card>
+          <CardContent>データがありません。</CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (!Array.isArray(data)) {
     return (
-      <div>
-        <h3>Note: データが配列形式ではありません</h3>
-        <p>データの型: {typeof data}</p>
-        <pre>{JSON.stringify(data, null, 2)}</pre>
+      <div className="flex justify-center mt-4">
+        <Card className="w-full max-w-3xl">
+          <CardHeader>
+            <CardTitle>正常に登録できました！</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>データの型: {typeof data}</p>
+            <pre className="mt-2 p-2 bg-gray-100 rounded">
+              {JSON.stringify(data, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (data.length === 0) {
-    return <div>データが空です。</div>;
+    return (
+      <div className="flex justify-center mt-4">
+        <Card>
+          <CardContent>データが空です。</CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>商品名</th>
-          <th>単品JAN</th>
-          <th>kintone</th>
-          <th>情報</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((item, index) => (
-          <tr key={index}>
-            <td>{item.productName}</td>
-            <td>{item.janCode}</td>
-            <td>{item.kintoneStatus}</td>
-            <td>{item.infoStatus}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="flex justify-center mt-4">
+      <Card className="w-full max-w-4xl">
+        <CardHeader>
+          <CardTitle>結果</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>商品名</TableHead>
+                <TableHead>単品JAN</TableHead>
+                <TableHead>kintone</TableHead>
+                <TableHead>情報</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{item.productName}</TableCell>
+                  <TableCell>{item.janCode}</TableCell>
+                  <TableCell>{item.kintoneStatus}</TableCell>
+                  <TableCell>{item.infoStatus}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

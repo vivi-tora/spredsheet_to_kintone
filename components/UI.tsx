@@ -12,6 +12,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
+console.log("UI.tsx");
+console.log(process.env.GAS_WEBAPP_URL);
+
 export const PasswordForm: React.FC<{
   onSubmit: (password: string) => void;
 }> = ({ onSubmit }) => {

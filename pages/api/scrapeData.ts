@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import puppeteer, { Browser } from 'puppeteer-extra';
+import puppeteer from 'puppeteer-extra';
+import type { Browser } from 'puppeteer';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { AppError, handleApiError } from '../../lib/errorHandling';
 import { scrapingRules } from '../../config/scrapingRules';
@@ -34,10 +35,10 @@ export default async function handler(
   const spreadsheetData = req.body;
   console.log(`Received ${spreadsheetData.length} items to scrape`);
 
-  let browser: Browser;
+  let browser: Browser; // 修正: 型を明示的に指定
   try {
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

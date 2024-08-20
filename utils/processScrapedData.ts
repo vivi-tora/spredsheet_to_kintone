@@ -23,13 +23,16 @@ export function processScrapedData(scrapedData: any[]): ProcessedItem[] {
   scrapedData.forEach((item: any) => {
     const groupKey = item.groupProductName || '';
 
+    console.log('item');
+    console.log(item);
+
     if (!groupedData[groupKey]) {
       groupedData[groupKey] = {
         manager: ['admin@vivionblue.com'],
         campaign_code: 'PL00030',
         campaign_name: '202404_大プラホビー',
-        ip_code: 'OU',
-        ip_name: '創彩少女庭園',
+        ip_code: item.workTitle || '',
+        ip_name: '',
         group_product_name: groupKey,
         size_info: item.specifications || '',
         other_info: item.description || '',
@@ -63,8 +66,7 @@ export function processScrapedData(scrapedData: any[]): ProcessedItem[] {
     });
 
     groupedData[groupKey].cost_list.push({
-      // company_name: item.supplier || '',
-      company_name: '株式会社大阪プラスチックモデル' || '',
+      company_name: item.supplier || '',
       cost_including_tax: item.purchasingCostIncTax || '',
     });
   });

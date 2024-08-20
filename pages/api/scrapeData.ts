@@ -50,7 +50,7 @@ export default async function handler(
     const scrapedData = await Promise.all(
       spreadsheetData.map(async (item: any, index: number) => {
         try {
-          await delay(index * 2000); // 2秒ごとに遅延
+          await delay(index * 2000); // スクレイピングツールブロック避け
           console.log(`Processing item ${index + 1}/${spreadsheetData.length}, JAN: ${item.singleProductJan}`);
 
           const tsuruData = await scrapeTsurumai(browser, item.singleProductJan, scrapingRules.tsuruHobby, {

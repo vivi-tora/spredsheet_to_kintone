@@ -42,7 +42,7 @@ export const ResultsTable: React.FC<{ data: any }> = ({ data }) => {
   if (!Array.isArray(data)) {
     return (
       <div>
-        <h3>データが配列形式ではありません</h3>
+        <h3>Note: データが配列形式ではありません</h3>
         <p>データの型: {typeof data}</p>
         <pre>{JSON.stringify(data, null, 2)}</pre>
       </div>

@@ -98,8 +98,8 @@ export default async function handler(
             ? item.product_list.map(product => ({
                 value: {
                   バリエーション名称: { value: product.variation_name || '' },
-                  JANコード: { value: product.jan_code || '' },
-                  BOXJANコード: { value: product.box_jan_code || '' },
+                  JAN: { value: product.jan_code || '' },
+                  BOXJAN: { value: product.box_jan_code || '' },
                   原単価: { value: product.original_unit_price || '' },
                   単価税抜: { value: product.unit_price_ex_tax || '' },
                   原産国: { value: product.country_of_origin || '' },

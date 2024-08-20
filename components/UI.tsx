@@ -13,13 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
 console.log("UI.tsx");
-console.log(process.env.GAS_WEBAPP_URL);
-console.log(process.env.KINTONE_BASE_URL);
-console.log(process.env.KINTONE_API_TOKEN_EXTERNAL_PURCHASE);
-console.log(process.env.KINTONE_API_TOKEN_IP_MASTER);
-console.log(process.env.KINTONE_API_TOKEN_STRATEGY_MANAGEMENT);
-console.log(process.env.KINTONE_API_TOKEN_PRODUCT_CATEGORY_MASTER);
-console.log(process.env.KINTONE_API_TOKEN_CLIENT);
+console.log(process.env.NEXT_PUBLIC_GAS_WEBAPP_URL);
+console.log(process.env.NEXT_PUBLIC_KINTONE_BASE_URL);
+console.log(process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_EXTERNAL_PURCHASE);
+console.log(process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_IP_MASTER);
+console.log(process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_STRATEGY_MANAGEMENT);
+console.log(process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_PRODUCT_CATEGORY_MASTER);
+console.log(process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_CLIENT);
 
 export const PasswordForm: React.FC<{
   onSubmit: (password: string) => void;

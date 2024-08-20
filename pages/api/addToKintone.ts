@@ -59,14 +59,14 @@ export default async function handler(
 
   try {
     const client = new KintoneRestAPIClient({
-      baseUrl: process.env.KINTONE_BASE_URL,
+      baseUrl: process.env.NEXT_PUBLIC_KINTONE_BASE_URL,
       auth: {
         apiToken: [
-          process.env.KINTONE_API_TOKEN_EXTERNAL_PURCHASE,
-          process.env.KINTONE_API_TOKEN_IP_MASTER,
-          process.env.KINTONE_API_TOKEN_STRATEGY_MANAGEMENT,
-          process.env.KINTONE_API_TOKEN_PRODUCT_CATEGORY_MASTER,
-          process.env.KINTONE_API_TOKEN_CLIENT,
+          process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_EXTERNAL_PURCHASE,
+          process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_IP_MASTER,
+          process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_STRATEGY_MANAGEMENT,
+          process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_PRODUCT_CATEGORY_MASTER,
+          process.env.NEXT_PUBLIC_KINTONE_API_TOKEN_CLIENT,
         ].filter((token): token is string => typeof token === 'string')
       },
     });

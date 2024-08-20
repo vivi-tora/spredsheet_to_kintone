@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import axios from 'axios';
 import { AppError, handleApiError } from '../../lib/errorHandling';
 
-const GAS_URL = process.env.GAS_WEBAPP_URL;
+const GAS_URL = process.env.NEXT_PUBLIC_GAS_WEBAPP_URL;
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,7 +10,7 @@ export default async function handler(
 ) {
   try {
     if (!GAS_URL) {
-      throw new AppError('GAS_WEBAPP_URL is not defined in environment variables', 500);
+      throw new AppError('NEXT_PUBLIC_GAS_WEBAPP_URL is not defined in environment variables', 500);
     }
 
     const response = await axios.get(GAS_URL, {

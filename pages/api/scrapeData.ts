@@ -1,13 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import puppeteer from "puppeteer-extra";
+import puppeteer from "puppeteer";
 import type { Browser } from "puppeteer";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { AppError, handleApiError } from "../../lib/errorHandling";
 import { scrapingRules } from "../../config/scrapingRules";
 import { scrapeTsurumai } from "./scrapeTsurumai";
 import { scrapeAmiami } from "./scrapeAmiami";
 
-puppeteer.use(StealthPlugin());
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

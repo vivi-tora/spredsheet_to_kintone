@@ -33,7 +33,16 @@ function runMiddleware(
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const hasNonEmptyValues = (obj: Record<string, any>): boolean => {
-  // ... (既存のコード)
+  return Object.values(obj).some((value) => {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed !== "" && trimmed !== "---  ---";
+    }
+    if (typeof value === "object" && value !== null) {
+      return hasNonEmptyValues(value);
+    }
+    return value !== null && value !== undefined;
+  });
 };
 
 async function scrapeWebsite(url: string, selectors: any) {

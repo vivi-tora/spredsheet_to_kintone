@@ -5,9 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p $PORT",
-    "lint": "next lint",
-    "heroku-postbuild": "npm run build"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "@kintone/rest-api-client": "^5.5.2",
@@ -15,13 +14,13 @@
     "@types/puppeteer-core": "^7.0.4",
     "axios": "^1.7.2",
     "cheerio": "^1.0.0-rc.12",
-    "chrome-aws-lambda": "^10.1.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
     "googleapis": "^140.0.1",
     "lucide-react": "^0.428.0",
     "next": "14.2.4",
-    "puppeteer": "^22.12.1",
+    "puppeteer": "^22.15.0",
     "puppeteer-core": "^23.1.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
@@ -31,6 +30,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/node": "^20.14.10",
     "@types/react": "^18",
     "@types/react-dom": "^18",

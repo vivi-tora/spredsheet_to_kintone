@@ -1,11 +1,31 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import puppeteer from "puppeteer";
-import type { Browser } from "puppeteer";
-import { AppError, handleApiError } from "../../lib/errorHandling";
 import { scrapingRules } from "../../config/scrapingRules";
 import { scrapeTsurumai } from "./scrapeTsurumai";
 import { scrapeAmiami } from "./scrapeAmiami";
+import Cors from "cors";
+import type { NextApiHandler } from "next";
 
+// CORSミドルウェアの初期化
+const cors = Cors({
+  methods: ["POST", "HEAD"],
+});
+
+// ミドルウェア実行用のヘルパー関数
+function runMiddleware(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  fn: (req: NextApiRequest, res: NextApiResponse, next: (result: any) => void) => void
+) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result: any) => {
+      if (result instanceof Error) {
+        return reject(result)
+      }
+      return resolve(result)
+    })
+  })
+}
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -22,10 +42,17 @@ const hasNonEmptyValues = (obj: Record<string, any>): boolean => {
   });
 };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+async function getBrowser() {
+  const browser = await puppeteer.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    headless: true,
+  });
+  return browser;
+}
+
+const handler: NextApiHandler = async (req, res) => {
+  await runMiddleware(req, res, cors);
+
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
@@ -33,31 +60,25 @@ export default async function handler(
   const spreadsheetData = req.body;
   console.log(`Received ${spreadsheetData.length} items to scrape`);
 
-  let browser: Browser | null = null; // browser を null で初期化
+  let browser = null;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-web-security",
-        "--disable-features=IsolateOrigins,site-per-process",
-      ],
-    });
+    browser = await getBrowser();
     console.log("Browser launched successfully");
 
-    const scrapedData = await Promise.all(
-      spreadsheetData.map(async (item: any, index: number) => {
-        try {
-          await delay(index * 2000); // スクレイピングツールブロック避け
-          console.log(
-            `Processing item ${index + 1}/${spreadsheetData.length}, JAN: ${
-              item.singleProductJan
-            }`
-          );
+    const scrapedData = [];
+    for (const [index, item] of spreadsheetData.entries()) {
+      try {
+        await delay(index * 2000);
+        console.log(
+          `Processing item ${index + 1}/${spreadsheetData.length}, JAN: ${
+            item.singleProductJan
+          }`
+        );
 
+        const page = await browser.newPage();
+        try {
           const tsuruData = await scrapeTsurumai(
-            browser!,
+            browser,
             item.singleProductJan,
             scrapingRules.tsuruHobby,
             {
@@ -65,18 +86,16 @@ export default async function handler(
               specifications: item.specifications || "",
             }
           );
-          console.log(
-            `Tsurumai data for JAN ${item.singleProductJan}:`,
-            tsuruData
-          );
+
           if (hasNonEmptyValues(tsuruData)) {
             item.description = tsuruData.description;
             item.specifications = tsuruData.specifications;
-            return item;
+            scrapedData.push(item);
+            continue;
           }
 
           const amiamiData = await scrapeAmiami(
-            browser!,
+            browser,
             item.singleProductJan,
             scrapingRules.amiami,
             {
@@ -84,43 +103,43 @@ export default async function handler(
               specifications: item.specifications || "",
             }
           );
-          console.log(
-            `Amiami data for JAN ${item.singleProductJan}:`,
-            amiamiData
-          );
+
           if (hasNonEmptyValues(amiamiData)) {
             item.description = amiamiData.description;
             item.specifications = amiamiData.specifications;
-            return item;
+            scrapedData.push(item);
+            continue;
           }
 
           console.log(`No valid data found for JAN ${item.singleProductJan}`);
-          return item;
-        } catch (error) {
-          console.error(
-            `Error scraping data for JAN ${item.singleProductJan}:`,
-            error
-          );
-          return { ...item, error: String(error) };
+          scrapedData.push(item);
+        } finally {
+          await page.close();
         }
-      })
-    );
+      } catch (error) {
+        console.error(
+          `Error scraping data for JAN ${item.singleProductJan}:`,
+          error
+        );
+        scrapedData.push({ ...item, error: String(error) });
+      }
+    }
 
     console.log("All items processed");
     res.status(200).json(scrapedData);
   } catch (error) {
     console.error("Error in scrapeData handler:", error);
-    const { statusCode, message } = handleApiError(error);
-    res
-      .status(statusCode)
-      .json({
-        message,
-        error: error instanceof Error ? error.stack : String(error),
-      });
+    res.status(500).json({
+      message: "Internal server error",
+      error: error instanceof Error ? error.message : String(error),
+    });
   } finally {
     if (browser) {
       await browser.close();
       console.log("Browser closed");
     }
   }
-}
+};
+
+export default handler;
+

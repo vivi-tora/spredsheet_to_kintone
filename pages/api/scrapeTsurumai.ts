@@ -9,7 +9,7 @@ export async function scrapeTsurumai(
 ) {
   try {
     const url = rule.url.replace("{janCode}", singleProductJan);
-    console.log(`Navigating to URL: ${url}`);
+    console.log(`[DEBUG] Tsurumai - Navigating to URL: ${url}`);
 
     const response = await axios.get(url, {
       headers: {
@@ -18,26 +18,27 @@ export async function scrapeTsurumai(
       },
     });
 
+    console.log(`[DEBUG] Tsurumai - Response status: ${response.status}`);
     const root = parse(response.data);
-    console.log("Page loaded, parsing content");
+    console.log("[DEBUG] Tsurumai - Page loaded, parsing content");
 
     const newData: { description: string; specifications: string } = {
       description: "",
       specifications: "",
     };
 
-
-    
-
     // Handle description separately
     const descElement = root.querySelector('p[itemprop="description"]');
     if (descElement) {
       newData.description = descElement.text.trim();
       console.log(
-        `Description found: ${newData.description.substring(0, 50)}...`
+        `[DEBUG] Tsurumai - Description found: ${newData.description.substring(
+          0,
+          100
+        )}...`
       );
     } else {
-      console.log("Description element not found");
+      console.log("[DEBUG] Tsurumai - Description element not found");
     }
 
     // Handle other selectors
@@ -51,12 +52,14 @@ export async function scrapeTsurumai(
           if (dd && dd.tagName === "DD") {
             const content = dd.text.trim();
             newData.specifications += `${searchText}: ${content}\n`;
-            console.log(`${key} found: ${content.substring(0, 50)}...`);
+            console.log(
+              `[DEBUG] Tsurumai - ${key} found: ${content.substring(0, 50)}...`
+            );
           } else {
-            console.log(`DD element not found for ${key}`);
+            console.log(`[DEBUG] Tsurumai - DD element not found for ${key}`);
           }
         } else {
-          console.log(`DT element not found for ${key}`);
+          console.log(`[DEBUG] Tsurumai - DT element not found for ${key}`);
         }
       }
     }
@@ -72,10 +75,11 @@ export async function scrapeTsurumai(
         newData.specifications,
     };
 
-    console.log("Final scraping result:", result);
+    console.log("[DEBUG] Tsurumai - Final scraping result:");
+    console.log(JSON.stringify(result, null, 2));
     return result;
   } catch (error) {
-    console.error("Error in scrapeTsurumai:", error);
+    console.error("[DEBUG] Tsurumai - Error in scrapeTsurumai:", error);
     if (error instanceof Error) {
       throw new AppError(`Error scraping Tsurumai: ${error.message}`, 500, {
         singleProductJan,

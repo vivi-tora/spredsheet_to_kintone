@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import puppeteer from "puppeteer";
+import chromium from "chrome-aws-lambda";
+import puppeteer from "puppeteer-core";
 import { scrapingRules } from "../../config/scrapingRules";
 import { scrapeTsurumai } from "./scrapeTsurumai";
 import { scrapeAmiami } from "./scrapeAmiami";
@@ -15,16 +16,20 @@ const cors = Cors({
 function runMiddleware(
   req: NextApiRequest,
   res: NextApiResponse,
-  fn: (req: NextApiRequest, res: NextApiResponse, next: (result: any) => void) => void
+  fn: (
+    req: NextApiRequest,
+    res: NextApiResponse,
+    next: (result: any) => void
+  ) => void
 ) {
   return new Promise((resolve, reject) => {
     fn(req, res, (result: any) => {
       if (result instanceof Error) {
-        return reject(result)
+        return reject(result);
       }
-      return resolve(result)
-    })
-  })
+      return resolve(result);
+    });
+  });
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,11 +48,15 @@ const hasNonEmptyValues = (obj: Record<string, any>): boolean => {
 };
 
 async function getBrowser() {
-  const browser = await puppeteer.launch({
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    headless: true,
+  const executablePath = await chromium.executablePath;
+
+  return puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath,
+    headless: chromium.headless,
+    ignoreHTTPSErrors: true,
   });
-  return browser;
 }
 
 const handler: NextApiHandler = async (req, res) => {
@@ -128,10 +137,13 @@ const handler: NextApiHandler = async (req, res) => {
     console.log("All items processed");
     res.status(200).json(scrapedData);
   } catch (error) {
-    console.error("Error in scrapeData handler:", error);
+    console.error("Detailed error in scrapeData:", error);
     res.status(500).json({
       message: "Internal server error",
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        error instanceof Error
+          ? `${error.message}\nStack: ${error.stack}`
+          : String(error),
     });
   } finally {
     if (browser) {
@@ -142,4 +154,3 @@ const handler: NextApiHandler = async (req, res) => {
 };
 
 export default handler;
-

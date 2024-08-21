@@ -56,6 +56,11 @@ async function getBrowser() {
     executablePath,
     headless: chromium.headless,
     ignoreHTTPSErrors: true,
+    env: {
+      ...process.env,
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true",
+    },
+    dumpio: true, // デバッグ用に標準出力と標準エラー出力を表示
   });
 }
 
@@ -138,6 +143,10 @@ const handler: NextApiHandler = async (req, res) => {
     res.status(200).json(scrapedData);
   } catch (error) {
     console.error("Detailed error in scrapeData:", error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    }
     res.status(500).json({
       message: "Internal server error",
       error:

@@ -26,6 +26,7 @@ export async function scrapeTsurumai(
       specifications: "",
     };
 
+
     
 
     // Handle description separately

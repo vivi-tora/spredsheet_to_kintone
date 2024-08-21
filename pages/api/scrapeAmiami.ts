@@ -11,7 +11,7 @@ export async function scrapeAmiami(
 ) {
   try {
     const url = rule.url.replace("{janCode}", singleProductJan);
-    console.log(`Navigating to URL: ${url}`);
+    console.log(`[DEBUG] Amiami - Navigating to URL: ${url}`);
 
     const response = await axios.get(url, {
       headers: {
@@ -20,13 +20,14 @@ export async function scrapeAmiami(
       },
     });
 
+    console.log(`[DEBUG] Amiami - Response status: ${response.status}`);
     const root = parse(response.data);
-    console.log("Page loaded, parsing content");
+    console.log("[DEBUG] Amiami - Page loaded, parsing content");
 
     const productBoxes = root.querySelectorAll(
       ".product_table_list .product_box, .product_box"
     );
-    console.log(`Found ${productBoxes.length} product boxes`);
+    console.log(`[DEBUG] Amiami - Found ${productBoxes.length} product boxes`);
 
     if (productBoxes.length > 0) {
       const lastProductBox = productBoxes[productBoxes.length - 1];
@@ -34,10 +35,12 @@ export async function scrapeAmiami(
         .querySelector("a")
         ?.getAttribute("href");
 
-      console.log(`Product link found: ${productLink}`);
+      console.log(`[DEBUG] Amiami - Product link found: ${productLink}`);
 
       if (productLink) {
-        console.log(`Navigating to product page: ${productLink}`);
+        console.log(
+          `[DEBUG] Amiami - Navigating to product page: ${productLink}`
+        );
         const productResponse = await axios.get(productLink, {
           headers: {
             "User-Agent":
@@ -45,6 +48,9 @@ export async function scrapeAmiami(
           },
         });
 
+        console.log(
+          `[DEBUG] Amiami - Product page response status: ${productResponse.status}`
+        );
         const productRoot = parse(productResponse.data);
         const explainDiv = productRoot.querySelector("#explain.explain");
 
@@ -61,7 +67,15 @@ export async function scrapeAmiami(
             const specContent = specHeading.nextElementSibling;
             if (specContent) {
               newData.specifications = specContent.text.trim();
+              console.log(
+                `[DEBUG] Amiami - Specifications found: ${newData.specifications.substring(
+                  0,
+                  100
+                )}...`
+              );
             }
+          } else {
+            console.log("[DEBUG] Amiami - Specifications heading not found");
           }
 
           const descHeading = explainDiv
@@ -71,8 +85,18 @@ export async function scrapeAmiami(
             const descContent = descHeading.nextElementSibling;
             if (descContent) {
               newData.description = descContent.text.trim();
+              console.log(
+                `[DEBUG] Amiami - Description found: ${newData.description.substring(
+                  0,
+                  100
+                )}...`
+              );
             }
+          } else {
+            console.log("[DEBUG] Amiami - Description heading not found");
           }
+        } else {
+          console.log("[DEBUG] Amiami - Explain div not found");
         }
 
         const result = {
@@ -88,18 +112,20 @@ export async function scrapeAmiami(
             newData.specifications,
         };
 
-        console.log("Scraping result:", result);
+        console.log("[DEBUG] Amiami - Final scraping result:");
+        console.log(JSON.stringify(result, null, 2));
         return result;
       } else {
-        console.log("No product link found");
+        console.log("[DEBUG] Amiami - No product link found");
       }
     } else {
-      console.log("No product boxes found with any selector");
+      console.log("[DEBUG] Amiami - No product boxes found with any selector");
     }
 
+    console.log("[DEBUG] Amiami - Returning existing data (no new data found)");
     return existingData;
   } catch (error) {
-    console.error("Error in scrapeAmiami:", error);
+    console.error("[DEBUG] Amiami - Error in scrapeAmiami:", error);
     if (error instanceof Error) {
       throw new AppError(`Error scraping Amiami: ${error.message}`, 500, {
         singleProductJan,

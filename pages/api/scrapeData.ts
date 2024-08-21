@@ -1,9 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import chromium from "chrome-aws-lambda";
-import puppeteer from "puppeteer-core";
+import { parse } from "node-html-parser";
+import axios from "axios";
 import { scrapingRules } from "../../config/scrapingRules";
-import { scrapeTsurumai } from "./scrapeTsurumai";
-import { scrapeAmiami } from "./scrapeAmiami";
 import Cors from "cors";
 import type { NextApiHandler } from "next";
 
@@ -35,33 +33,31 @@ function runMiddleware(
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const hasNonEmptyValues = (obj: Record<string, any>): boolean => {
-  return Object.values(obj).some((value) => {
-    if (typeof value === "string") {
-      const trimmed = value.trim();
-      return trimmed !== "" && trimmed !== "---  ---";
-    }
-    if (typeof value === "object" && value !== null) {
-      return hasNonEmptyValues(value);
-    }
-    return value !== null && value !== undefined;
-  });
+  // ... (既存のコード)
 };
 
-async function getBrowser() {
-  const executablePath = await chromium.executablePath;
+async function scrapeWebsite(url: string, selectors: any) {
+  const response = await axios.get(url);
+  const root = parse(response.data);
 
-  return puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath,
-    headless: chromium.headless,
-    ignoreHTTPSErrors: true,
-    env: {
-      ...process.env,
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true",
-    },
-    dumpio: true, // デバッグ用に標準出力と標準エラー出力を表示
-  });
+  const data: { description: string; specifications: string } = {
+    description: "",
+    specifications: "",
+  };
+
+  if (selectors.description) {
+    const descElement = root.querySelector(selectors.description);
+    if (descElement) {
+      data.description = descElement.text.trim();
+    }
+  }
+
+  if (selectors.specifications) {
+    const specElements = root.querySelectorAll(selectors.specifications);
+    data.specifications = specElements.map((el) => el.text.trim()).join("\n");
+  }
+
+  return data;
 }
 
 const handler: NextApiHandler = async (req, res) => {
@@ -74,11 +70,7 @@ const handler: NextApiHandler = async (req, res) => {
   const spreadsheetData = req.body;
   console.log(`Received ${spreadsheetData.length} items to scrape`);
 
-  let browser = null;
   try {
-    browser = await getBrowser();
-    console.log("Browser launched successfully");
-
     const scrapedData = [];
     for (const [index, item] of spreadsheetData.entries()) {
       try {
@@ -89,47 +81,40 @@ const handler: NextApiHandler = async (req, res) => {
           }`
         );
 
-        const page = await browser.newPage();
-        try {
-          const tsuruData = await scrapeTsurumai(
-            browser,
-            item.singleProductJan,
-            scrapingRules.tsuruHobby,
-            {
-              description: item.description || "",
-              specifications: item.specifications || "",
-            }
-          );
+        const tsuruUrl = scrapingRules.tsuruHobby.url.replace(
+          "{janCode}",
+          item.singleProductJan
+        );
+        const tsuruData = await scrapeWebsite(
+          tsuruUrl,
+          scrapingRules.tsuruHobby.selectors
+        );
 
-          if (hasNonEmptyValues(tsuruData)) {
-            item.description = tsuruData.description;
-            item.specifications = tsuruData.specifications;
-            scrapedData.push(item);
-            continue;
-          }
-
-          const amiamiData = await scrapeAmiami(
-            browser,
-            item.singleProductJan,
-            scrapingRules.amiami,
-            {
-              description: item.description || "",
-              specifications: item.specifications || "",
-            }
-          );
-
-          if (hasNonEmptyValues(amiamiData)) {
-            item.description = amiamiData.description;
-            item.specifications = amiamiData.specifications;
-            scrapedData.push(item);
-            continue;
-          }
-
-          console.log(`No valid data found for JAN ${item.singleProductJan}`);
+        if (hasNonEmptyValues(tsuruData)) {
+          item.description = tsuruData.description;
+          item.specifications = tsuruData.specifications;
           scrapedData.push(item);
-        } finally {
-          await page.close();
+          continue;
         }
+
+        const amiamiUrl = scrapingRules.amiami.url.replace(
+          "{janCode}",
+          item.singleProductJan
+        );
+        const amiamiData = await scrapeWebsite(
+          amiamiUrl,
+          scrapingRules.amiami.selectors
+        );
+
+        if (hasNonEmptyValues(amiamiData)) {
+          item.description = amiamiData.description;
+          item.specifications = amiamiData.specifications;
+          scrapedData.push(item);
+          continue;
+        }
+
+        console.log(`No valid data found for JAN ${item.singleProductJan}`);
+        scrapedData.push(item);
       } catch (error) {
         console.error(
           `Error scraping data for JAN ${item.singleProductJan}:`,
@@ -143,10 +128,6 @@ const handler: NextApiHandler = async (req, res) => {
     res.status(200).json(scrapedData);
   } catch (error) {
     console.error("Detailed error in scrapeData:", error);
-    if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
     res.status(500).json({
       message: "Internal server error",
       error:
@@ -154,11 +135,6 @@ const handler: NextApiHandler = async (req, res) => {
           ? `${error.message}\nStack: ${error.stack}`
           : String(error),
     });
-  } finally {
-    if (browser) {
-      await browser.close();
-      console.log("Browser closed");
-    }
   }
 };
 

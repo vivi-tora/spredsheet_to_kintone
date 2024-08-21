@@ -1,103 +1,79 @@
-import type { Browser } from "puppeteer-core";
+import axios from "axios";
+import { parse } from "node-html-parser";
 import { AppError } from "../../lib/errorHandling";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function scrapeAmiami(
-  browser: Browser,
   singleProductJan: string,
   rule: any,
   existingData: { description: string; specifications: string }
 ) {
-  const page = await browser.newPage();
   try {
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    );
-
     const url = rule.url.replace("{janCode}", singleProductJan);
     console.log(`Navigating to URL: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
-    await page.setViewport({ width: 1280, height: 800 });
 
-    console.log("Page loaded, waiting for content");
-
-    const isChallengePresent = await page.evaluate(() => {
-      return document.title.includes("Attention Required! | Cloudflare");
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
     });
 
-    if (isChallengePresent) {
-      console.log("Cloudflare challenge detected. Waiting for 30 seconds...");
-      await page.evaluate(wait, 30000);
-      await page.reload({ waitUntil: "networkidle0" });
-    }
+    const root = parse(response.data);
+    console.log("Page loaded, parsing content");
 
-    const productBoxExists = await page.evaluate(() => {
-      return (
-        !!document.querySelector(".product_table_list .product_box") ||
-        !!document.querySelector(".product_box") ||
-        !!document.querySelector("#search_table")
-      );
-    });
-
-    console.log("Product box exists:", productBoxExists);
-
-    if (!productBoxExists) {
-      console.log("Product box not found, waiting for 10 seconds");
-      await page.evaluate(wait, 10000);
-    }
-
-    const productBoxes = await page.$$(
+    const productBoxes = root.querySelectorAll(
       ".product_table_list .product_box, .product_box"
     );
     console.log(`Found ${productBoxes.length} product boxes`);
 
     if (productBoxes.length > 0) {
       const lastProductBox = productBoxes[productBoxes.length - 1];
-      const productLink = await lastProductBox
-        .$eval("a", (el) => el.href)
-        .catch(() => null);
+      const productLink = lastProductBox
+        .querySelector("a")
+        ?.getAttribute("href");
 
       console.log(`Product link found: ${productLink}`);
 
       if (productLink) {
         console.log(`Navigating to product page: ${productLink}`);
-        await page.goto(productLink, {
-          waitUntil: "networkidle0",
-          timeout: 60000,
+        const productResponse = await axios.get(productLink, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          },
         });
 
-        await page.waitForSelector("#explain.explain", { timeout: 30000 });
+        const productRoot = parse(productResponse.data);
+        const explainDiv = productRoot.querySelector("#explain.explain");
 
-        const newData = await page.evaluate(() => {
-          const data: { description: string; specifications: string } = {
-            description: "",
-            specifications: "",
-          };
-          const explainDiv = document.querySelector("#explain.explain");
-          if (explainDiv) {
-            const specHeading = Array.from(
-              explainDiv.querySelectorAll("p.heading_07")
-            ).find((el) => el.textContent?.includes("製品仕様"));
-            if (specHeading) {
-              const specContent = specHeading.nextElementSibling;
-              if (specContent) {
-                data.specifications = specContent.textContent?.trim() || "";
-              }
-            }
+        const newData: { description: string; specifications: string } = {
+          description: "",
+          specifications: "",
+        };
 
-            const descHeading = Array.from(
-              explainDiv.querySelectorAll("p.heading_07")
-            ).find((el) => el.textContent?.includes("解説"));
-            if (descHeading) {
-              const descContent = descHeading.nextElementSibling;
-              if (descContent) {
-                data.description = descContent.textContent?.trim() || "";
-              }
+        if (explainDiv) {
+          const specHeading = explainDiv
+            .querySelectorAll("p.heading_07")
+            .find((el) => el.text.includes("製品仕様"));
+          if (specHeading) {
+            const specContent = specHeading.nextElementSibling;
+            if (specContent) {
+              newData.specifications = specContent.text.trim();
             }
           }
-          return data;
-        });
+
+          const descHeading = explainDiv
+            .querySelectorAll("p.heading_07")
+            .find((el) => el.text.includes("解説"));
+          if (descHeading) {
+            const descContent = descHeading.nextElementSibling;
+            if (descContent) {
+              newData.description = descContent.text.trim();
+            }
+          }
+        }
 
         const result = {
           description:
@@ -134,7 +110,5 @@ export async function scrapeAmiami(
       singleProductJan,
       rule,
     });
-  } finally {
-    await page.close();
   }
 }

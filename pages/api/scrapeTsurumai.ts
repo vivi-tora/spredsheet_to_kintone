@@ -1,81 +1,62 @@
-import type { Browser } from "puppeteer-core";
+import axios from "axios";
+import { parse } from "node-html-parser";
 import { AppError } from "../../lib/errorHandling";
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export async function scrapeTsurumai(
-  browser: Browser,
   singleProductJan: string,
   rule: any,
   existingData: { description: string; specifications: string }
 ) {
-  const page = await browser.newPage();
   try {
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    );
-
     const url = rule.url.replace("{janCode}", singleProductJan);
     console.log(`Navigating to URL: ${url}`);
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
-    await page.setViewport({ width: 1280, height: 800 });
 
-    console.log("Page loaded, waiting for content");
-
-    const productExists = await page.evaluate(() => {
-      return (
-        !!document.querySelector('p[itemprop="description"]') ||
-        !!document.querySelector("dt")
-      );
+    const response = await axios.get(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
     });
 
-    console.log("Product information exists:", productExists);
+    const root = parse(response.data);
+    console.log("Page loaded, parsing content");
 
-    if (!productExists) {
-      // console.log('Product information not found, waiting for 10 seconds');
-      // await page.evaluate(wait, 10000);
+    const newData: { description: string; specifications: string } = {
+      description: "",
+      specifications: "",
+    };
+
+    // Handle description separately
+    const descElement = root.querySelector('p[itemprop="description"]');
+    if (descElement) {
+      newData.description = descElement.text.trim();
+      console.log(
+        `Description found: ${newData.description.substring(0, 50)}...`
+      );
+    } else {
+      console.log("Description element not found");
     }
 
-    const newData = await page.evaluate((selectors) => {
-      const data: { description: string; specifications: string } = {
-        description: "",
-        specifications: "",
-      };
-
-      // Handle description separately
-      const descElement = document.querySelector('p[itemprop="description"]');
-      if (descElement) {
-        data.description = descElement.textContent?.trim() || "";
-        console.log(
-          `Description found: ${data.description.substring(0, 50)}...`
-        );
-      } else {
-        console.log("Description element not found");
-      }
-
-      // Handle other selectors
-      for (const [key, searchText] of Object.entries(selectors)) {
-        if (key !== "description") {
-          const dt = Array.from(document.querySelectorAll("dt")).find((el) =>
-            el.textContent?.includes(searchText as string)
-          );
-          if (dt) {
-            const dd = dt.nextElementSibling;
-            if (dd && dd.tagName === "DD") {
-              const content = dd.textContent?.trim() || "";
-              data.specifications += `${searchText}: ${content}\n`;
-              console.log(`${key} found: ${content.substring(0, 50)}...`);
-            } else {
-              console.log(`DD element not found for ${key}`);
-            }
+    // Handle other selectors
+    for (const [key, searchText] of Object.entries(rule.selectors)) {
+      if (key !== "description") {
+        const dt = root
+          .querySelectorAll("dt")
+          .find((el) => el.text.includes(searchText as string));
+        if (dt) {
+          const dd = dt.nextElementSibling;
+          if (dd && dd.tagName === "DD") {
+            const content = dd.text.trim();
+            newData.specifications += `${searchText}: ${content}\n`;
+            console.log(`${key} found: ${content.substring(0, 50)}...`);
           } else {
-            console.log(`DT element not found for ${key}`);
+            console.log(`DD element not found for ${key}`);
           }
+        } else {
+          console.log(`DT element not found for ${key}`);
         }
       }
-
-      return data;
-    }, rule.selectors);
+    }
 
     const result = {
       description:
@@ -102,7 +83,5 @@ export async function scrapeTsurumai(
       singleProductJan,
       rule,
     });
-  } finally {
-    await page.close();
   }
 }

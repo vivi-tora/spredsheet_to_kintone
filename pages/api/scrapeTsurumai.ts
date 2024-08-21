@@ -1,4 +1,4 @@
-import type { Browser } from "puppeteer";
+import type { Browser } from "puppeteer-core";
 import { AppError } from "../../lib/errorHandling";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

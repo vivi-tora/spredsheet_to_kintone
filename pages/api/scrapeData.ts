@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import puppeteer from "puppeteer";
-import type { Browser } from "puppeteer";
+import chrome from "chrome-aws-lambda";
+import puppeteer from "puppeteer-core";
+import type { Browser } from "puppeteer-core";
 import { AppError, handleApiError } from "../../lib/errorHandling";
 import { scrapingRules } from "../../config/scrapingRules";
 import { scrapeTsurumai } from "./scrapeTsurumai";
 import { scrapeAmiami } from "./scrapeAmiami";
-
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -36,13 +36,9 @@ export default async function handler(
   let browser: Browser | null = null; // browser を null で初期化
   try {
     browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-web-security",
-        "--disable-features=IsolateOrigins,site-per-process",
-      ],
+      args: chrome.args,
+      executablePath: await chrome.executablePath,
+      headless: chrome.headless,
     });
     console.log("Browser launched successfully");
 
@@ -111,12 +107,10 @@ export default async function handler(
   } catch (error) {
     console.error("Error in scrapeData handler:", error);
     const { statusCode, message } = handleApiError(error);
-    res
-      .status(statusCode)
-      .json({
-        message,
-        error: error instanceof Error ? error.stack : String(error),
-      });
+    res.status(statusCode).json({
+      message,
+      error: error instanceof Error ? error.stack : String(error),
+    });
   } finally {
     if (browser) {
       await browser.close();

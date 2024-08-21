@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/scrapeData.ts": {
+    "pages/api/scrapeData.ts": {
       "memory": 1024,
       "maxDuration": 60
     }

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { parse } from "node-html-parser";
 import { AppError } from "../../lib/errorHandling";
 
@@ -6,7 +6,7 @@ export async function scrapeTsurumai(
   singleProductJan: string,
   rule: any,
   existingData: { description: string; specifications: string }
-) {
+): Promise<{ description: string; specifications: string }> {
   try {
     const url = rule.url.replace("{janCode}", singleProductJan);
     console.log(`[DEBUG] Tsurumai - Navigating to URL: ${url}`);
@@ -16,9 +16,18 @@ export async function scrapeTsurumai(
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       },
+      validateStatus: (status) => status < 500, // Allow 404 to be handled without throwing
     });
 
     console.log(`[DEBUG] Tsurumai - Response status: ${response.status}`);
+
+    if (response.status === 404) {
+      console.log(
+        `[DEBUG] Tsurumai - Page not found for JAN: ${singleProductJan}`
+      );
+      return existingData; // Return existing data without modification
+    }
+
     const root = parse(response.data);
     console.log("[DEBUG] Tsurumai - Page loaded, parsing content");
 
@@ -80,6 +89,29 @@ export async function scrapeTsurumai(
     return result;
   } catch (error) {
     console.error("[DEBUG] Tsurumai - Error in scrapeTsurumai:", error);
+    if (axios.isAxiosError(error)) {
+      const axiosError = error as AxiosError;
+      if (axiosError.response) {
+        console.log(
+          `[DEBUG] Tsurumai - Response status: ${axiosError.response.status}`
+        );
+        console.log(
+          `[DEBUG] Tsurumai - Response data: ${JSON.stringify(
+            axiosError.response.data
+          )}`
+        );
+      }
+      throw new AppError(
+        `Error scraping Tsurumai: ${axiosError.message}`,
+        axiosError.response?.status || 500,
+        {
+          singleProductJan,
+          rule,
+          responseStatus: axiosError.response?.status,
+          responseData: axiosError.response?.data,
+        }
+      );
+    }
     if (error instanceof Error) {
       throw new AppError(`Error scraping Tsurumai: ${error.message}`, 500, {
         singleProductJan,

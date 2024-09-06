@@ -22,6 +22,7 @@ export const PasswordForm: React.FC<{
     onSubmit(password);
   };
 
+  
   return (
     <div className="flex justify-center items-center min-h-screen">
       <Card className="w-[350px]">

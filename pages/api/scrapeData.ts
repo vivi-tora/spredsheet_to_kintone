@@ -95,7 +95,7 @@ const handler: NextApiHandler = async (req, res) => {
     for (let i = 0; i < spreadsheetData.length; i += BATCH_SIZE) {
       const batch = spreadsheetData.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
-        batch.map((item, index) =>
+        batch.map((item: any, index: number) =>
           limit(() => scrapeItem(item, i + index, spreadsheetData.length))
         )
       );

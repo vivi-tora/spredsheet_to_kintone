@@ -1,3 +1,5 @@
+// processScrapedData.ts
+
 interface ProcessedItem {
   manager: string[];
   campaign_code: string;

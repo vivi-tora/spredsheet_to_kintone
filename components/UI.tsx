@@ -1,3 +1,5 @@
+// UI.tsx
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +24,7 @@ export const PasswordForm: React.FC<{
     onSubmit(password);
   };
 
-  
+
   return (
     <div className="flex justify-center items-center min-h-screen">
       <Card className="w-[350px]">

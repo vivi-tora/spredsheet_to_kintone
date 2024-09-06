@@ -4,6 +4,7 @@ import axios from "axios";
 import { scrapingRules } from "../../config/scrapingRules";
 import Cors from "cors";
 import type { NextApiHandler } from "next";
+import pLimit from "p-limit";
 
 // CORSミドルウェアの初期化
 const cors = Cors({
@@ -46,7 +47,12 @@ const hasNonEmptyValues = (obj: Record<string, any>): boolean => {
 };
 
 async function scrapeWebsite(url: string, selectors: any) {
-  const response = await axios.get(url);
+  const response = await axios.get(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    },
+  });
   const root = parse(response.data);
 
   const data: { description: string; specifications: string } = {
@@ -69,6 +75,9 @@ async function scrapeWebsite(url: string, selectors: any) {
   return data;
 }
 
+const BATCH_SIZE = 10;
+const CONCURRENCY_LIMIT = 5;
+
 const handler: NextApiHandler = async (req, res) => {
   await runMiddleware(req, res, cors);
 
@@ -80,57 +89,17 @@ const handler: NextApiHandler = async (req, res) => {
   console.log(`Received ${spreadsheetData.length} items to scrape`);
 
   try {
+    const limit = pLimit(CONCURRENCY_LIMIT);
     const scrapedData = [];
-    for (const [index, item] of spreadsheetData.entries()) {
-      try {
-        await delay(index * 2000);
-        console.log(
-          `Processing item ${index + 1}/${spreadsheetData.length}, JAN: ${
-            item.singleProductJan
-          }`
-        );
 
-        const tsuruUrl = scrapingRules.tsuruHobby.url.replace(
-          "{janCode}",
-          item.singleProductJan
-        );
-        const tsuruData = await scrapeWebsite(
-          tsuruUrl,
-          scrapingRules.tsuruHobby.selectors
-        );
-
-        if (hasNonEmptyValues(tsuruData)) {
-          item.description = tsuruData.description;
-          item.specifications = tsuruData.specifications;
-          scrapedData.push(item);
-          continue;
-        }
-
-        const amiamiUrl = scrapingRules.amiami.url.replace(
-          "{janCode}",
-          item.singleProductJan
-        );
-        const amiamiData = await scrapeWebsite(
-          amiamiUrl,
-          scrapingRules.amiami.selectors
-        );
-
-        if (hasNonEmptyValues(amiamiData)) {
-          item.description = amiamiData.description;
-          item.specifications = amiamiData.specifications;
-          scrapedData.push(item);
-          continue;
-        }
-
-        console.log(`No valid data found for JAN ${item.singleProductJan}`);
-        scrapedData.push(item);
-      } catch (error) {
-        console.error(
-          `Error scraping data for JAN ${item.singleProductJan}:`,
-          error
-        );
-        scrapedData.push({ ...item, error: String(error) });
-      }
+    for (let i = 0; i < spreadsheetData.length; i += BATCH_SIZE) {
+      const batch = spreadsheetData.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map((item, index) =>
+          limit(() => scrapeItem(item, i + index, spreadsheetData.length))
+        )
+      );
+      scrapedData.push(...batchResults);
     }
 
     console.log("All items processed");
@@ -146,5 +115,53 @@ const handler: NextApiHandler = async (req, res) => {
     });
   }
 };
+
+async function scrapeItem(item: any, index: number, total: number) {
+  try {
+    await delay(500); // Reduced delay
+    console.log(
+      `Processing item ${index + 1}/${total}, JAN: ${item.singleProductJan}`
+    );
+
+    const tsuruUrl = scrapingRules.tsuruHobby.url.replace(
+      "{janCode}",
+      item.singleProductJan
+    );
+    const tsuruData = await scrapeWebsite(
+      tsuruUrl,
+      scrapingRules.tsuruHobby.selectors
+    );
+
+    if (hasNonEmptyValues(tsuruData)) {
+      item.description = tsuruData.description;
+      item.specifications = tsuruData.specifications;
+      return item;
+    }
+
+    const amiamiUrl = scrapingRules.amiami.url.replace(
+      "{janCode}",
+      item.singleProductJan
+    );
+    const amiamiData = await scrapeWebsite(
+      amiamiUrl,
+      scrapingRules.amiami.selectors
+    );
+
+    if (hasNonEmptyValues(amiamiData)) {
+      item.description = amiamiData.description;
+      item.specifications = amiamiData.specifications;
+      return item;
+    }
+
+    console.log(`No valid data found for JAN ${item.singleProductJan}`);
+    return item;
+  } catch (error) {
+    console.error(
+      `Error scraping data for JAN ${item.singleProductJan}:`,
+      error
+    );
+    return { ...item, error: String(error) };
+  }
+}
 
 export default handler;

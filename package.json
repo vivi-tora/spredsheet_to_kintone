@@ -20,11 +20,13 @@
     "lucide-react": "^0.428.0",
     "next": "14.2.4",
     "node-html-parser": "^6.1.13",
+    "p-limit": "^6.1.0",
     "puppeteer": "^22.15.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "^18",
     "react-dom": "^18",
+    "react-progressbar": "^15.4.1",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7"
   },
